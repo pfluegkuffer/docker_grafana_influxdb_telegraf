@@ -1,5 +1,5 @@
 networks:
-  influxdb:
+  influxdb_telegraf_net:
 
 services:
   influxdb:
@@ -11,21 +11,36 @@ services:
       - "8090:8090"
       - "2003:2003"
     networks:
-      - influxdb
+      - influxdb_telegraf_net
     env_file:
       - 'env.influxdb'
     volumes:
       # Data persistency
       # sudo mkdir -p /srv/docker/influxdb/data
-      - /srv/docker/influxdb/data:/var/lib/influxdb
+      - /srv/docker/influxdb/data:/var/lib/influxdb2
+      - /srv/docker/influxdb/config:/etc/influxdb2
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=pi
+      - DOCKER_INFLUXDB_INIT_PASSWORD=raspberry
+      - DOCKER_INFLUXDB_INIT_ORG=pi
+      - DOCKER_INFLUXDB_INIT_BUCKET=pi
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=raspberry
+    restart:  unless-stopped
 
   telegraf:
     image: telegraf:latest
     container_name: telegraf
+    hostname: pi_telegraf
     networks:
-      - influxdb
+      - influxdb_telegraf_net
     volumes:
       - ./telegraf.conf:/etc/telegraf/telegraf.conf:ro
+    environment:
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=raspberry
+      - DOCKER_INFLUXDB_INIT_ORG=pi
+      - DOCKER_INFLUXDB_INIT_BUCKET=pi
+    restart:  unless-stopped
 
   grafana:
     image: grafana/grafana:latest
@@ -33,9 +48,12 @@ services:
     ports:
       - "3000:3000"
     networks:
-      - influxdb
-    env_file:
-      - 'env.grafana'
+      - influxdb_telegraf_net
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    #env_file:
+    #  - 'env.grafana'
     user: "0"
     links:
       - influxdb
@@ -43,3 +61,4 @@ services:
       # Data persistency
       # sudo mkdir -p /srv/docker/grafana/data; chown 472:472 /srv/docker/grafana/data
       - /srv/docker/grafana/data:/var/lib/grafana
+    restart:  unless-stopped
